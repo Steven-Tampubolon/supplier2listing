@@ -23,3 +23,12 @@
 ## D-005 (Langkah 5B): header tak baku tidak ditolak
 - Apa: file dengan judul kolom tak dikenali (mis. `Art.No`, `Desc`, `Mrk`) tetap dipotong per 5 baris untuk AI; parser aturan melewatinya dengan peringatan (`header_recognized: false`, `rules_records: []`).
 - Mengapa: 4 dari 16 file non-PDF di gold seperti itu; menolaknya menutup jalur AI. Sinonim tidak ditambah karena `Desc` pada file itu bermakna nama produk, bukan deskripsi (menebak = salah).
+
+## D-006 (Langkah 5C): /api/export mengembalikan JSON berisi CSV, bukan berkas
+- Apa: respons `{filename, csv, rows, skipped_unapproved, exported_with_blockers, warnings}`; frontend membuat unduhan dari string `csv`.
+- Mengapa: peringatan konversi satuan (sel dikosongkan) perlu sampai ke pengguna; header HTTP kustom rawan di CORS dan tidak aman untuk teks non-ASCII.
+- Dampak: isi CSV identik; tes memeriksa isinya langsung.
+
+## D-007 (Langkah 5C): CSV tanpa BOM
+- Apa: UTF-8 polos, pemisah `,`, akhir baris CRLF.
+- Dampak: Excel dapat salah menampilkan karakter non-ASCII jika dibuka dengan klik ganda; GTIN 13 digit tampil sebagai notasi ilmiah di Excel. Cukup impor lewat Data > From Text/CSV. Dicatat di README.

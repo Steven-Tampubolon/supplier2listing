@@ -4,8 +4,10 @@ from typing import Annotated, Any, Literal
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
+from app.export import ExportError, build_export
 from app.parse import MAX_BYTES, ParseError, parse_file
 from app.rules import extract_rules
 from app.settings import SAMPLES_DIR
@@ -13,7 +15,7 @@ from app.validate import summarize, validate_records
 
 load_dotenv()
 
-VERSION = "0.3.0"
+VERSION = "0.4.0"
 
 SAMPLES = [
     {
@@ -121,3 +123,19 @@ class ValidateRequest(BaseModel):
 def validate(req: ValidateRequest) -> dict:
     records, issues = validate_records(req.records, req.category)
     return {"records": records, "issues": issues, "summary": summarize(issues)}
+
+
+class ExportRequest(BaseModel):
+    records: list[dict[str, Any]] = Field(max_length=400)
+    category: Literal["fashion", "electronics", "beauty"] | None = None
+    confirm_blockers: bool = False
+
+
+@app.post("/api/export")
+def export(req: ExportRequest):
+    try:
+        return build_export(req.records, req.category, req.confirm_blockers)
+    except ExportError as e:
+        if e.blocked:  # butuh konfirmasi eksplisit dari pengguna
+            return JSONResponse(status_code=409, content={"detail": str(e), "blocked_skus": e.blocked})
+        raise HTTPException(status_code=400, detail=str(e)) from e
