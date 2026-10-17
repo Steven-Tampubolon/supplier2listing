@@ -1,6 +1,7 @@
-"""Smoke test produksi. Pemakaian: python scripts/smoke_e2e.py https://<backend>.onrender.com"""
+"""Smoke test produksi. Pemakaian: python scripts/smoke_e2e.py https://<backend>.vercel.app"""
 import json
 import sys
+import urllib.error
 import urllib.request
 
 
@@ -11,8 +12,17 @@ def get(url: str, timeout: int = 90):
 
 def main(base: str) -> int:
     base = base.rstrip("/")
-    status, body = get(f"{base}/api/health")
-    assert status == 200 and body.get("status") == "ok", f"health gagal: {status} {body}"
+    try:
+        status, body = get(f"{base}/api/health")
+    except urllib.error.HTTPError as e:
+        print(f"GAGAL /api/health: HTTP {e.code} {e.reason} ({base})")
+        return 1
+    except urllib.error.URLError as e:
+        print(f"GAGAL /api/health: tidak terjangkau ({e.reason}); cek ejaan URL: {base}")
+        return 1
+    if status != 200 or body.get("status") != "ok":
+        print(f"GAGAL /api/health: {status} {body}")
+        return 1
     print("OK  /api/health", body)
     return 0
 
