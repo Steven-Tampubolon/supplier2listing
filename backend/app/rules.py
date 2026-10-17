@@ -4,14 +4,14 @@ from __future__ import annotations
 import json
 from functools import lru_cache
 
+from app import settings
 from app.harness.baseline import predict
-from app.settings import CONFIG_DIR
 
 
 @lru_cache(maxsize=1)
 def _taxonomy_index() -> dict[str, str]:
     """Segmen terakhir (casefold) -> jalur lengkap; hanya yang unik."""
-    paths = json.loads((CONFIG_DIR / "taxonomy.json").read_text(encoding="utf-8"))
+    paths = json.loads((settings.CONFIG_DIR / "taxonomy.json").read_text(encoding="utf-8"))
     seen: dict[str, list[str]] = {}
     for p in paths:
         seen.setdefault(p.split(" > ")[-1].casefold(), []).append(p)

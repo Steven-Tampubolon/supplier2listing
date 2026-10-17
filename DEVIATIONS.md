@@ -32,3 +32,11 @@
 ## D-007 (Langkah 5C): CSV tanpa BOM
 - Apa: UTF-8 polos, pemisah `,`, akhir baris CRLF.
 - Dampak: Excel dapat salah menampilkan karakter non-ASCII jika dibuka dengan klik ganda; GTIN 13 digit tampil sebagai notasi ilmiah di Excel. Cukup impor lewat Data > From Text/CSV. Dicatat di README.
+
+## D-008 (Langkah 6): rincian klien LLM dan cadangan
+- Fallback ke aturan hanya menandai field BERNILAI sebagai needs_review; field kosong tetap `missing`. Alasan: bila `missing` ikut diubah, validator memperlakukannya sebagai ditinjau dan GTIN_MISSING/REQUIRED_ATTR_MISSING hilang. Dokumen sprint menyebut "semua field".
+- HTTP 500 diulang sekali seperti 502/503/504 (D-013/D-015 mencatat 500 'Gateway Timeout' dari hulu). Timeout klien TIDAK diulang (menggandakan waktu dan biaya); JSON rusak TIDAK diulang (temperature 0, hasil sama).
+- Timeout 120 detik adalah batas TOTAL per panggilan (asyncio.wait_for), bukan per fase. Seluruh percobaan dibatasi 240 detik karena fungsi Vercel Hobby maksimal 300 detik.
+- Keluaran AI tidak dipercaya: status tidak valid -> needs_review (bukan extracted); SKU yang tidak ada di teks potongan dibuang; nilai tanpa kutipan bukti di sumber -> needs_review; SKU yang hilang diisi dari parser aturan (needs_review).
+- `description` tidak dikeluarkan AI (sesuai prompt); diambil dari parser aturan agar klaim tetap terdeteksi. Pada berkas berheader tak baku jalur ini tidak ada, sehingga CLAIM_UNSUBSTANTIATED tidak dapat terdeteksi.
+- Penghitung anggaran ada di memori per instance serverless (upaya terbaik); sisa kuota akun dibaca dari header respons AMD dan menjadi pagar bersama. Tidak ada hook "saat start" di serverless, jadi pembacaan GET /v1/models dari dokumen sprint tidak dilakukan.

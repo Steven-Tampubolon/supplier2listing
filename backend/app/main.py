@@ -2,12 +2,15 @@ import os
 from typing import Annotated, Any, Literal
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
+from app.budget import Budget
 from app.export import ExportError, build_export
+from app.extract import run_extract
+from app.llm import LLMClient, LLMConfig
 from app.parse import MAX_BYTES, ParseError, parse_file
 from app.rules import extract_rules
 from app.settings import SAMPLES_DIR
@@ -15,7 +18,7 @@ from app.validate import summarize, validate_records
 
 load_dotenv()
 
-VERSION = "0.4.0"
+VERSION = "0.5.0"
 
 SAMPLES = [
     {
@@ -63,7 +66,41 @@ app.add_middleware(
 
 
 def _ai_enabled() -> bool:
-    return bool(os.getenv("RADEON_API_KEY"))
+    return LLMConfig.from_env().enabled
+
+
+def _num_env(name: str, default: float, cast=float):
+    try:
+        return cast(os.getenv(name, default))
+    except ValueError:
+        return default
+
+
+_BUDGET: Budget | None = None
+
+
+def get_budget() -> Budget:
+    global _BUDGET
+    if _BUDGET is None:
+        _BUDGET = Budget(
+            max_day=_num_env("MAX_AI_CHUNKS_PER_DAY", 500, int),
+            max_ip_hour=_num_env("MAX_AI_CHUNKS_PER_IP_HOUR", 40, int),
+            min_remaining_usd=_num_env("AI_MIN_REMAINING_USD", 0.10),
+        )
+    return _BUDGET
+
+
+def get_llm() -> LLMClient:
+    return LLMClient(LLMConfig.from_env())
+
+
+def client_ip(request: Request) -> str:
+    """IP klien. Di Vercel, x-forwarded-for diisi platform dengan IP klien; alamat tidak pernah dicatat ke log."""
+    for header in ("x-vercel-forwarded-for", "x-forwarded-for"):
+        value = request.headers.get(header)
+        if value:
+            return value.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
 
 
 @app.get("/api/health")
@@ -73,8 +110,7 @@ def health() -> dict:
         "version": VERSION,
         "model": os.getenv("AI_MODEL", "DeepSeek-V4.1-Flash"),
         "ai_enabled": _ai_enabled(),
-        # sementara = batas harian; budget.py (Langkah 6) menggantinya dengan sisa nyata
-        "daily_ai_budget_left": int(os.getenv("MAX_AI_CHUNKS_PER_DAY", "500")),
+        "daily_ai_budget_left": get_budget().left() if _ai_enabled() else 0,
     }
 
 
@@ -139,3 +175,52 @@ def export(req: ExportRequest):
         if e.blocked:  # butuh konfirmasi eksplisit dari pengguna
             return JSONResponse(status_code=409, content={"detail": str(e), "blocked_skus": e.blocked})
         raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+MAX_CHUNK_CHARS = 40_000
+
+
+class ExtractRequest(BaseModel):
+    chunk: dict[str, Any]
+    category: Literal["fashion", "electronics", "beauty"] | None = None
+    mode: Literal["live", "replay", "rules"] = "rules"
+
+
+def _check_chunk(chunk: dict) -> None:
+    text = chunk.get("text")
+    if not isinstance(text, str) or not text.strip():
+        raise HTTPException(status_code=422, detail="Potongan tidak valid: teks kosong.")
+    if len(text) > MAX_CHUNK_CHARS:
+        raise HTTPException(status_code=422, detail="Potongan terlalu besar untuk diproses.")
+    skus = chunk.get("skus", [])
+    if not isinstance(skus, list) or not all(isinstance(x, str) for x in skus):
+        raise HTTPException(status_code=422, detail="Potongan tidak valid: daftar SKU rusak.")
+
+
+@app.post("/api/extract")
+async def extract(
+    req: ExtractRequest,
+    request: Request,
+    llm: Annotated[LLMClient, Depends(get_llm)],
+    budget: Annotated[Budget, Depends(get_budget)],
+):
+    _check_chunk(req.chunk)
+    if req.mode == "live":
+        if not llm.cfg.enabled:
+            raise HTTPException(
+                status_code=503, detail="Mode Live tidak tersedia saat ini. Gunakan mode Replay atau Aturan."
+            )
+        decision = budget.reserve(client_ip(request))
+        if not decision.ok:
+            headers = {"Retry-After": str(decision.retry_after)} if decision.retry_after else None
+            return JSONResponse(
+                status_code=429,
+                content={"detail": decision.message, "reason": decision.reason, "suggestion": "replay"},
+                headers=headers,
+            )
+    try:
+        out = await run_extract(req.chunk, req.category, req.mode, llm)
+    except (KeyError, TypeError, ValueError, IndexError, AttributeError) as e:
+        raise HTTPException(status_code=422, detail="Potongan tidak valid atau rusak.") from e
+    budget.observe(out.pop("_remaining_usd"))
+    return out

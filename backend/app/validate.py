@@ -6,9 +6,9 @@ import json
 import re
 from functools import lru_cache
 
+from app import settings
 from app.harness.baseline import COLOR_WORDS
 from app.harness.common import CRITICAL, norm_key
-from app.settings import CONFIG_DIR
 
 SEVERITY = {
     "GTIN_INVALID": "blocker",
@@ -61,7 +61,7 @@ LENGTH_RE = re.compile(r"(?<![\w.])(\d+(?:[.,]\d+)?)\s?m(?![\w])", re.IGNORECASE
 
 @lru_cache(maxsize=1)
 def _rules() -> dict:
-    return json.loads((CONFIG_DIR / "channel_rules_v0.json").read_text(encoding="utf-8"))
+    return json.loads((settings.CONFIG_DIR / "channel_rules_v0.json").read_text(encoding="utf-8"))
 
 
 def required_fields(category: str | None) -> list[str]:
