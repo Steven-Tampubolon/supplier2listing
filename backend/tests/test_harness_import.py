@@ -14,5 +14,5 @@ def test_header_mapping():
 
 
 def test_schema_rejects_garbage():
-    recs, errs, ok = parse_and_validate("bukan json")
+    recs, _errs, ok = parse_and_validate("bukan json")
     assert recs == {} and ok is False
