@@ -1,0 +1,48 @@
+{
+ "_catatan": "Aturan kanal v0 untuk benchmark (bukan aturan marketplace nyata). Aturan panjang deskripsi 30 kata dinonaktifkan karena deskripsi sintetis pendek.",
+ "required_fields": {
+  "fashion": [
+   "brand",
+   "material",
+   "color",
+   "size",
+   "cost_price",
+   "weight_item"
+  ],
+  "electronics": [
+   "brand",
+   "mpn",
+   "gtin",
+   "warranty",
+   "weight_item",
+   "weight_package",
+   "dims_item"
+  ],
+  "beauty": [
+   "brand",
+   "net_content",
+   "ingredients",
+   "gtin"
+  ]
+ },
+ "universal_required": [
+  "name",
+  "brand",
+  "category",
+  "cost_price",
+  "stock"
+ ],
+ "issue_definitions": {
+  "REQUIRED_ATTR_MISSING": "Field wajib kategori bernilai null/kosong (selain GTIN yang memakai GTIN_MISSING). field = nama field. Keparahan: warning.",
+  "GTIN_MISSING": "gtin kosong. warning.",
+  "GTIN_INVALID": "gtin ada tetapi panjang bukan 13 digit atau check digit GS1 salah. blocker.",
+  "WEIGHT_SCOPE_AMBIGUOUS": "Ada kolom berat tanpa penjelasan apakah berat produk atau kemasan (rekaman memuat weight_item_raw dan weight_item_source_header). field = weight_item. warning.",
+  "VALUE_CONFLICT": "Ada dua nilai berbeda untuk field yang sama dari sumber berbeda (rekaman memuat <field>_candidates). field = nama field. warning.",
+  "TITLE_ATTR_CONTRADICTION": "Nama produk menyebut warna/kapasitas/panjang yang berbeda dari atribut varian. field = nama field atribut (color, capacity, length). warning.",
+  "DUPLICATE_SKU": "source_row_count > 1 untuk SKU yang sama. field = supplier_sku. warning.",
+  "CLAIM_UNSUBSTANTIATED": "Deskripsi memuat klaim medis atau superlatif tanpa dasar (menyembuhkan, terbukti klinis, 100% aman, cures, clinically proven). field = description. blocker.",
+  "CATEGORY_AMBIGUOUS": "Kategori mentah terlalu umum (Lainnya, Others) atau nama produk generik. field = category. warning.",
+  "ATTR_UNREADABLE": "Hanya untuk tugas gambar (T2); tidak dipakai di T5."
+ },
+ "gtin_check": "GTIN-13: jumlahkan digit 1..12 dengan bobot 1,3,1,3,...; check digit = (10 - jumlah mod 10) mod 10."
+}
