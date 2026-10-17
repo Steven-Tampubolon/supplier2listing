@@ -54,10 +54,40 @@ def _apply_category(records: list[dict], chunk: dict) -> None:
             }
 
 
+def _raw_column(chunk: dict, key: str) -> dict[str, str]:
+    """sku -> nilai sel kolom `key` dari baris pertama SKU itu."""
+    col = chunk["columns"]
+    if key not in col or "sku" not in col:
+        return {}
+    out: dict[str, str] = {}
+    rows = {int(k): v for k, v in chunk["grid"]["rows"].items()}
+    for rn in sorted(rows):
+        if rn <= chunk["header_row"]:
+            continue
+        c = rows[rn]
+        sku = c[col["sku"]].strip() if col["sku"] < len(c) else ""
+        if sku and sku not in out:
+            out[sku] = c[col[key]].strip() if col[key] < len(c) else ""
+    return out
+
+
+def _apply_description(records: list[dict], chunk: dict) -> None:
+    """Deskripsi dibawa apa adanya agar validator dapat memeriksa klaim."""
+    for rec in records:
+        text = _raw_column(chunk, "description").get(rec["supplier_sku"], "")
+        if text:
+            rec["fields"]["description"] = {
+                "value": text, "status": "extracted", "evidence": text, "confidence": None,
+            }
+
+
 def extract_rules(chunk: dict, category: str | None) -> list[dict]:
+    if not chunk.get("columns"):  # header tidak dikenali: parser aturan tidak dapat membaca
+        return []
     out = json.loads(predict({"grid": chunk["grid"]}, category_hint=category))
     records: list[dict] = out["records"]
     _apply_category(records, chunk)
+    _apply_description(records, chunk)
     counts = chunk.get("duplicate_counts", {})
     for rec in records:
         if rec["supplier_sku"] in counts:

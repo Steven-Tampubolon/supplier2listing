@@ -144,10 +144,7 @@ def parse_file(filename: str, data: bytes, category: str | None = None) -> dict:
 
     n_hdr, hdr_row, cmap = find_header(grid)
     if hdr_row is None or n_hdr < 3 or "sku" not in cmap:
-        raise ParseError(
-            "Header kolom tidak dikenali. Pastikan ada baris judul kolom yang memuat minimal "
-            "kolom SKU dan dua kolom lain (mis. Nama Produk, Merek)."
-        )
+        return _parse_unrecognized(filename, fmt, sheet, grid, extra_sheets, category, warnings)
     col: dict[str, int] = {}
     for i, k in enumerate(cmap):
         if k and k not in col:
@@ -166,9 +163,12 @@ def parse_file(filename: str, data: bytes, category: str | None = None) -> dict:
             continue
         cells = grid[rn]
         sku = cells[sku_col].strip() if sku_col < len(cells) else ""
+        filled = sum(1 for c in cells if c.strip())
         if not sku:
-            if sum(1 for c in cells if c.strip()) >= 3:
+            if filled >= 3:
                 skipped_nosku.append(rn)
+            continue
+        if filled < 2:  # satu sel saja = catatan kaki/judul, bukan baris data
             continue
         if ";" in sku:
             multi_variant.append(rn)
@@ -227,7 +227,8 @@ def parse_file(filename: str, data: bytes, category: str | None = None) -> dict:
                 "columns": col,
                 "sheet": sheet,
                 "text": text,
-                "grid": {"header_row": hdr_row, "rows": {str(r): grid[r] for r in shown}},
+                # catatan kaki hanya untuk teks AI; grid aturan hanya berisi judul dan baris data
+                "grid": {"header_row": hdr_row, "rows": {str(r): grid[r] for r in ctx_rows + rows}},
             }
         )
 
@@ -235,6 +236,7 @@ def parse_file(filename: str, data: bytes, category: str | None = None) -> dict:
     return {
         "filename": filename,
         "format": fmt,
+        "header_recognized": True,
         "sheet": sheet,
         "category": resolved,
         "category_source": "user" if category else ("inferred" if resolved else None),
@@ -248,3 +250,70 @@ def parse_file(filename: str, data: bytes, category: str | None = None) -> dict:
 def _fmt_rows(rows: list[int], limit: int = 8) -> str:
     s = ", ".join(str(r) for r in rows[:limit])
     return s + (", ..." if len(rows) > limit else "")
+
+
+def _parse_unrecognized(
+    filename: str,
+    fmt: str,
+    sheet: str | None,
+    grid: dict[int, list[str]],
+    extra_sheets: dict[str, dict[int, list[str]]],
+    category: str | None,
+    warnings: list[str],
+) -> dict:
+    """Header tidak baku: tetap dipotong per CHUNK_SKUS baris untuk AI; parser aturan tidak dapat membacanya."""
+    width = {rn: sum(1 for c in cells if c.strip()) for rn, cells in grid.items()}
+    head_candidates = [rn for rn in sorted(grid)[:10] if width[rn] >= 3]
+    if not head_candidates:
+        raise ParseError("Berkas tidak memuat tabel dengan minimal 3 kolom.")
+    best = max(width[rn] for rn in head_candidates)
+    hdr_row = next(rn for rn in head_candidates if width[rn] == best)
+    data_rows = [rn for rn in sorted(grid) if rn > hdr_row and width[rn] >= 3]
+    if not data_rows:
+        raise ParseError("Tidak ada baris data di bawah judul kolom.")
+    if len(data_rows) > MAX_DATA_ROWS:
+        raise ParseError(f"Berkas memuat {len(data_rows)} baris data; batas demo adalah {MAX_DATA_ROWS} baris.")
+    heads = ", ".join(h.strip() for h in grid[hdr_row] if h.strip())
+    warnings.append(
+        f"Judul kolom tidak baku ({heads}). Parser aturan tidak dapat membaca berkas ini; "
+        "gunakan mode Live AI atau Replay."
+    )
+    for sn in extra_sheets:
+        warnings.append(f"Sheet '{sn}' disertakan sebagai konteks untuk AI.")
+    extra_text = ""
+    for sn, g in extra_sheets.items():
+        extra_text += f"\n\nSHEET: {sn}\n" + grid_text(g, sorted(g)[:EXTRA_SHEET_ROWS])
+    ctx_rows = list(range(1, hdr_row + 1))
+    tail_rows = [r for r in sorted(grid) if r > data_rows[-1]]
+    chunks: list[dict] = []
+    for ci, start in enumerate(range(0, len(data_rows), CHUNK_SKUS)):
+        rows = data_rows[start : start + CHUNK_SKUS]
+        is_last = start + CHUNK_SKUS >= len(data_rows)
+        shown = ctx_rows + rows + (tail_rows if is_last else [])
+        sheet_line = f" | SHEET: {sheet}" if sheet else ""
+        chunks.append(
+            {
+                "chunk_id": f"c{ci}",
+                "index": ci,
+                "skus": [],
+                "rows": rows,
+                "duplicate_counts": {},
+                "header_row": hdr_row,
+                "columns": {},
+                "sheet": sheet,
+                "text": f"FILE: {filename}{sheet_line}\n" + grid_text(grid, shown) + extra_text,
+                "grid": {"header_row": hdr_row, "rows": {str(r): grid[r] for r in ctx_rows + rows}},
+            }
+        )
+    return {
+        "filename": filename,
+        "format": fmt,
+        "header_recognized": False,
+        "sheet": sheet,
+        "category": category,
+        "category_source": "user" if category else None,
+        "n_rows": len(data_rows),
+        "n_skus": None,
+        "chunks": chunks,
+        "warnings": warnings,
+    }

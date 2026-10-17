@@ -1,17 +1,19 @@
 import os
-from typing import Annotated
+from typing import Annotated, Any, Literal
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
 
 from app.parse import MAX_BYTES, ParseError, parse_file
 from app.rules import extract_rules
 from app.settings import SAMPLES_DIR
+from app.validate import summarize, validate_records
 
 load_dotenv()
 
-VERSION = "0.2.0"
+VERSION = "0.3.0"
 
 SAMPLES = [
     {
@@ -105,5 +107,17 @@ def parse(
         result = parse_file(filename, data, category)
     except ParseError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
+    # Header tak baku -> extract_rules mengembalikan [] (hanya AI yang dapat membaca)
     rules_records = [r for c in result["chunks"] for r in extract_rules(c, result["category"])]
     return {**result, "rules_records": rules_records}
+
+
+class ValidateRequest(BaseModel):
+    records: list[dict[str, Any]] = Field(max_length=400)
+    category: Literal["fashion", "electronics", "beauty"] | None = None
+
+
+@app.post("/api/validate")
+def validate(req: ValidateRequest) -> dict:
+    records, issues = validate_records(req.records, req.category)
+    return {"records": records, "issues": issues, "summary": summarize(issues)}

@@ -116,9 +116,20 @@ def test_rejects_oversize():
         parse_file("big.csv", b"a" * (2 * 1024 * 1024 + 1))
 
 
-def test_rejects_unknown_header():
-    with pytest.raises(ParseError, match="Header kolom tidak dikenali"):
-        parse_file("x.csv", b"foo,bar,baz\n1,2,3\n")
+def test_unknown_header_falls_back_to_ai_only_chunks():
+    data = b"Art.No,Desc,Mrk\nA-1,Kaos,Brand\nA-2,Celana,Brand\n"
+    result = parse_file("x.csv", data)
+    assert result["header_recognized"] is False
+    assert result["n_rows"] == 2 and result["n_skus"] is None
+    assert len(result["chunks"]) == 1
+    assert "Art.No" in result["chunks"][0]["text"]
+    assert any("tidak baku" in w for w in result["warnings"])
+    assert extract_rules(result["chunks"][0], None) == []
+
+
+def test_rejects_file_without_a_table():
+    with pytest.raises(ParseError, match="minimal 3 kolom"):
+        parse_file("x.csv", b"hanya,dua\n1,2\n")
 
 
 def test_rejects_corrupt_xlsx():
