@@ -40,3 +40,9 @@
 - Keluaran AI tidak dipercaya: status tidak valid -> needs_review (bukan extracted); SKU yang tidak ada di teks potongan dibuang; nilai tanpa kutipan bukti di sumber -> needs_review; SKU yang hilang diisi dari parser aturan (needs_review).
 - `description` tidak dikeluarkan AI (sesuai prompt); diambil dari parser aturan agar klaim tetap terdeteksi. Pada berkas berheader tak baku jalur ini tidak ada, sehingga CLAIM_UNSUBSTANTIATED tidak dapat terdeteksi.
 - Penghitung anggaran ada di memori per instance serverless (upaya terbaik); sisa kuota akun dibaca dari header respons AMD dan menjadi pagar bersama. Tidak ada hook "saat start" di serverless, jadi pembacaan GET /v1/models dari dokumen sprint tidak dilakukan.
+
+## D-009 (Langkah 6b): Live eksperimental; Replay direkam lewat streaming lokal
+- Temuan (uji langsung + latency_probe, 2026-10-18): DeepSeek-V4.1-Flash, potongan 5 SKU: token pertama 3 dtk, tetapi ~5 token/dtk dengan jeda sampai 18,5 dtk; tidak selesai dalam 290 dtk (non-streaming 120 dtk juga timeout). Panggilan kecil 1,6 dtk. Panggilan yang dibatalkan hampir tidak ditagih (selisih ~US$0,000006).
+- Keputusan: mode Live ditandai eksperimental (dokumen sprint A.8, aturan G4); demo bertumpu pada Replay. Live tetap jatuh ke aturan dengan label jujur.
+- Perekaman Replay dipindah ke skrip lokal (`scripts/record_replay.py`, streaming, timeout idle 120 dtk / total 900 dtk, 3 percobaan, dapat dilanjutkan) karena batas fungsi Vercel 300 dtk. Dijalankan paralel dengan pekerjaan frontend (lebih awal dari jadwal jam 7).
+- Teks potongan dibekukan: mengubah parse.py setelah rekaman membatalkan cache (kunci = hash teks).

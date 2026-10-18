@@ -210,3 +210,6 @@ async def run_extract(chunk: dict, category: str | None, mode: str, llm: LLMClie
     out["records"] = _finish(records, category)
     out["latency_ms"] = int((time.monotonic() - t0) * 1000)
     return out
+
+
+postprocess = _postprocess  # dipakai perekam Replay untuk mengukur mutu keluaran

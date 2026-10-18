@@ -1,0 +1,140 @@
+{
+ "records": [
+  {
+   "supplier_sku": "NEX-KB-03",
+   "product_group": "Nexio Mechanical Keyboard",
+   "fields": {
+    "name": {
+     "value": "Nexio Mechanical Keyboard",
+     "status": "extracted",
+     "evidence": "Nexio Mechanical Keyboard",
+     "confidence": 0.95
+    },
+    "brand": {
+     "value": "Nexio",
+     "status": "extracted",
+     "evidence": "Nexio",
+     "confidence": 0.95
+    },
+    "category": {
+     "value": "Electronics > Computer Accessories > Keyboards",
+     "status": "normalized",
+     "evidence": "Keyboards",
+     "confidence": 0.9
+    },
+    "gtin": {
+     "value": null,
+     "status": "missing",
+     "evidence": null,
+     "confidence": 0.95
+    },
+    "mpn": {
+     "value": "NEKB-140-PINK",
+     "status": "extracted",
+     "evidence": "NEKB-140-PINK",
+     "confidence": 0.95
+    },
+    "cost_price": {
+     "value": 45.81,
+     "status": "extracted",
+     "evidence": "$45.81",
+     "confidence": 0.95,
+     "unit": "USD"
+    },
+    "stock": {
+     "value": 116,
+     "status": "extracted",
+     "evidence": "116",
+     "confidence": 0.95
+    },
+    "color": {
+     "value": "pink",
+     "status": "normalized",
+     "evidence": "Pink",
+     "confidence": 0.95
+    },
+    "weight_item": {
+     "value": 780,
+     "status": "extracted",
+     "evidence": "780 g",
+     "confidence": 0.9,
+     "unit": "g"
+    },
+    "weight_package": {
+     "value": 1990,
+     "status": "extracted",
+     "evidence": "1990 g",
+     "confidence": 0.9,
+     "unit": "g"
+    },
+    "dims_item": {
+     "value": [
+      36.0,
+      14.0,
+      4.0
+     ],
+     "status": "extracted",
+     "evidence": "36.0 x 14.0 x 4.0 cm",
+     "confidence": 0.9,
+     "unit": "cm"
+    },
+    "warranty": {
+     "value": 12,
+     "status": "extracted",
+     "evidence": "12 months",
+     "confidence": 0.95,
+     "unit": "months"
+    },
+    "spec:Switch": {
+     "value": "Red linear",
+     "status": "extracted",
+     "evidence": "Switch: Red linear",
+     "confidence": 0.9
+    },
+    "spec:Layout": {
+     "value": "87-key TKL",
+     "status": "extracted",
+     "evidence": "Layout: 87-key TKL",
+     "confidence": 0.9
+    },
+    "spec:Connectivity": {
+     "value": "USB-C wired + Bluetooth 5.1",
+     "status": "extracted",
+     "evidence": "Connectivity: USB-C wired + Bluetooth 5.1",
+     "confidence": 0.9
+    }
+   },
+   "issues": [
+    {
+     "code": "GTIN_MISSING",
+     "field": "gtin"
+    },
+    {
+     "code": "VALUE_CONFLICT",
+     "field": "weight_item"
+    }
+   ]
+  }
+ ],
+ "recorded_at": "2026-10-18",
+ "model": "DeepSeek-V4.1-Flash",
+ "prompt_version": "t1_v0",
+ "usage": {
+  "prompt_tokens": 2075,
+  "completion_tokens": 625,
+  "cost": 0.000579768
+ },
+ "metrics": {
+  "records": 1,
+  "expected": 1,
+  "rules_filled": [],
+  "dropped_skus": [],
+  "evidence_downgraded": 0,
+  "seconds": 244,
+  "usage": {
+   "prompt_tokens": 2075,
+   "completion_tokens": 625,
+   "cost": 0.000579768
+  }
+ }
+}

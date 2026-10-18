@@ -1,0 +1,93 @@
+{
+ "records": [
+  {
+   "supplier_sku": "DER-FAC-02",
+   "product_group": "P-B001",
+   "fields": {
+    "name": {
+     "value": "Krim Pelembap Wajah Dermalia",
+     "status": "extracted",
+     "evidence": "Krim Pelembap Wajah Dermalia",
+     "confidence": 1.0
+    },
+    "brand": {
+     "value": "Dermalia",
+     "status": "extracted",
+     "evidence": "Dermalia",
+     "confidence": 1.0
+    },
+    "category": {
+     "value": "Beauty > Skincare > Moisturizers",
+     "status": "normalized",
+     "evidence": "Moisturizers",
+     "confidence": 0.9
+    },
+    "gtin": {
+     "value": null,
+     "status": "missing",
+     "evidence": null,
+     "confidence": 1.0
+    },
+    "mpn": {
+     "value": null,
+     "status": "missing",
+     "evidence": null,
+     "confidence": 1.0
+    },
+    "cost_price": {
+     "value": 98000,
+     "status": "extracted",
+     "evidence": "Rp 98.000",
+     "confidence": 1.0,
+     "unit": "IDR"
+    },
+    "stock": {
+     "value": 266,
+     "status": "extracted",
+     "evidence": "266",
+     "confidence": 1.0
+    },
+    "net_content": {
+     "value": 100,
+     "status": "extracted",
+     "evidence": "100 ml",
+     "confidence": 1.0,
+     "unit": "ml"
+    },
+    "ingredients": {
+     "value": "Aqua, Glycerin, Cetearyl Alcohol, Caprylic/Capric Triglyceride, Niacinamide, Panthenol, Dimethicone, Phenoxyethanol, Parfum",
+     "status": "extracted",
+     "evidence": "Aqua, Glycerin, Cetearyl Alcohol, Caprylic/Capric Triglyceride, Niacinamide, Panthenol, Dimethicone, Phenoxyethanol, Parfum",
+     "confidence": 1.0
+    }
+   },
+   "issues": [
+    {
+     "code": "GTIN_MISSING",
+     "field": "gtin"
+    }
+   ]
+  }
+ ],
+ "recorded_at": "2026-10-18",
+ "model": "DeepSeek-V4.1-Flash",
+ "prompt_version": "t1_v0",
+ "usage": {
+  "prompt_tokens": 1965,
+  "completion_tokens": 425,
+  "cost": 0.0002964752
+ },
+ "metrics": {
+  "records": 1,
+  "expected": 1,
+  "rules_filled": [],
+  "dropped_skus": [],
+  "evidence_downgraded": 0,
+  "seconds": 21,
+  "usage": {
+   "prompt_tokens": 1965,
+   "completion_tokens": 425,
+   "cost": 0.0002964752
+  }
+ }
+}

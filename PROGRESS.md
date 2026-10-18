@@ -8,3 +8,4 @@
 - [x] Langkah 5B: validator deterministik, /api/validate (71 tes lulus)
 - [x] Langkah 5C: /api/export, konversi satuan, perlindungan CSV injection (120 tes lulus)
 - [x] Langkah 6: klien LLM, anggaran, cache replay, /api/extract (193 tes lulus, G2 jalur Aturan)
+- [x] Langkah 6b: klien streaming + perekam Replay (206 tes); Live eksperimental (D-009). Berikutnya: Langkah 7 frontend (G3, sisa ~2 jam)

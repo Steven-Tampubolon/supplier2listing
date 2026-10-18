@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 import random
@@ -16,6 +17,36 @@ DEFAULT_BASE = "https://developer.amd.com.cn/radeon/api/v1"
 RETRY_STATUSES = {429, 500, 502, 503, 504}
 MAX_RETRY_WAIT = 20.0
 MIN_TIME_FOR_RETRY = 20.0
+
+
+def parse_sse_line(line: str) -> list[tuple[str, str]]:
+    """Daftar (jenis, teks) dari satu baris SSE: content, reasoning, usage, finish, atau done."""
+    if not line.startswith("data:"):
+        return []
+    data = line[5:].strip()
+    if data == "[DONE]":
+        return [("done", "")]
+    try:
+        obj = json.loads(data)
+    except ValueError:
+        return []
+    if not isinstance(obj, dict):
+        return []
+    out: list[tuple[str, str]] = []
+    if isinstance(obj.get("usage"), dict):
+        out.append(("usage", json.dumps(obj["usage"])))
+    for ch in obj.get("choices") or []:
+        if not isinstance(ch, dict):
+            continue
+        delta = ch.get("delta") or {}
+        if delta.get("content"):
+            out.append(("content", delta["content"]))
+        for k in ("reasoning", "reasoning_content"):
+            if delta.get(k):
+                out.append(("reasoning", delta[k]))
+        if ch.get("finish_reason"):
+            out.append(("finish", ch["finish_reason"]))
+    return out
 
 
 def _float_env(name: str, default: float) -> float:
@@ -172,3 +203,65 @@ class LLMClient:
         last.attempts = attempts
         last.remaining_usd = remaining_usd
         return last
+
+    async def stream_chat(
+        self, messages: list[dict], *, idle_timeout: float = 120.0, total_timeout: float = 900.0
+    ) -> ChatResult:
+        """Panggilan streaming untuk keluaran panjang (perekaman Replay). Tanpa ulangan otomatis: pemanggil mengulang.
+
+        Berhasil hanya bila finish_reason == 'stop'. Gagal: timeout (total), idle_timeout (jeda antar data),
+        truncated (length), stream_interrupted (terputus di tengah), serta status HTTP seperti pada chat().
+        """
+        payload = {**self.payload(messages), "stream": True, "stream_options": {"include_usage": True}}
+        headers = {"Authorization": f"Bearer {self.cfg.api_key}", "Content-Type": "application/json"}
+        started = self.clock()
+        st: dict = {"status": 0, "parts": [], "finish": None, "usage": {}, "remaining": None, "reason": None}
+
+        async def consume() -> None:
+            async with httpx.AsyncClient(transport=self.transport) as client:
+                async with client.stream("POST", f"{self.cfg.base_url}/chat/completions", json=payload,
+                                         headers=headers, timeout=None) as resp:
+                    st["status"], st["remaining"] = resp.status_code, _remaining_usd(resp.headers)
+                    if resp.status_code != 200:
+                        await resp.aread()
+                        return
+                    lines = resp.aiter_lines().__aiter__()
+                    while True:
+                        try:
+                            line = await asyncio.wait_for(lines.__anext__(), idle_timeout)
+                        except StopAsyncIteration:
+                            return
+                        except asyncio.TimeoutError:
+                            st["reason"] = "idle_timeout"
+                            return
+                        for kind, text in parse_sse_line(line):
+                            if kind == "content":
+                                st["parts"].append(text)
+                            elif kind == "finish":
+                                st["finish"] = text
+                            elif kind == "usage":
+                                u = json.loads(text)
+                                keys = ("prompt_tokens", "completion_tokens", "cost")
+                                st["usage"] = {k: u[k] for k in keys if k in u}
+
+        try:
+            await asyncio.wait_for(consume(), total_timeout)
+        except asyncio.TimeoutError:
+            st["reason"] = "timeout"
+        except httpx.TransportError:
+            st["reason"] = "stream_interrupted" if st["parts"] else "network"
+        content = "".join(st["parts"])
+        ms = int((self.clock() - started) * 1000)
+        reason = st["reason"]
+        if reason is None:
+            if st["status"] != 200:
+                reason = _reason_for_status(st["status"])
+            elif st["finish"] == "length":
+                reason = "truncated"
+            elif st["finish"] != "stop" or not content.strip():
+                reason = "stream_interrupted" if content else "empty_response"
+        return ChatResult(
+            ok=reason is None, content=content, reason=reason, status=st["status"], finish_reason=st["finish"],
+            usage=st["usage"], remaining_usd=st["remaining"], latency_ms=ms,
+            attempts=[{"status": st["status"], "latency_ms": ms}],
+        )
